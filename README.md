@@ -51,7 +51,6 @@
     ios_base::sync_with_stdio(false);
 	cin.tie(nullptr);
 	cout.tie(nullptr);
-        
 ```
 
 ## 三、缺省参数
@@ -78,6 +77,7 @@ C++支持在同一作用域中出现同名函数,但是要求这些同名函数�
 - 引用在定义时必须初始化
 - 一个变量可以有多个引用
 - 引用一旦引用一个实体，再不能引用其他实体。
+- 引用不能改变指向，所以在链式结构中，无法替代指针，这种场景必须使用指针。
 
 > [!IMPORTANT]
 >
@@ -154,32 +154,6 @@ typedef struct SList
     int capacity;
 }SL;
 
-
-void SLInit(SL& S,int n)
-{
-    S.arr = (int*)malloc(n * sizeof(int));
-    S.size = 0;
-    S.capacity = n;
-}
-
-void SLPushBack(SL& s,int data)
-{
-    // 满了先扩容：capacity==0 给默认 4，否则翻倍
-    if (s.size == s.capacity)
-    {
-        int newCapacity = s.capacity == 0 ? 4 : s.capacity * 2;
-        int* tmp = (int*)realloc(s.arr, newCapacity * sizeof(int));
-        if (tmp == nullptr)
-        {
-            perror("realloc failed");
-            exit(-1);
-        }
-        s.arr = tmp;
-        s.capacity = newCapacity;
-    }
-    s.arr[s.size++] = data;
-}
-
 //传值返回
 // int SLAt(SL& sl,int i)
 // {
@@ -194,6 +168,113 @@ int& SLAt(SL& sl,int i)
     assert(i < sl.size);
     return sl.arr[i];
 }
+```
 
+> [!WARNING]
+>
+> 这样写是不安全的，因为返回ret的别名是不安全的，ret是局部对象函数结束，ret就销毁了，返回它的别名本质也是一种类似野指针的行为
+>
+>
+> ```
+> int& f()
+> {
+> 	int ret = 0;
+> 	return ret;
+> }
+> ```
+>
+
+### 4、const引用
+
+- 可以引用一个const对象，但是必须用const引用。const引用也可以引用普通对象，因为对象的访问权限在引用过程中可以缩小，但是不能放大。
+- 所谓临时对象就是编译器需要一个空间暂存表达式的求值结果临时创建的一个未命名的对象，C++中把这个未命名对象叫做临时对象。
+- 在类型转换中会产生临时对象存储中间值，`int& rb = a*3;double d = 12.34;int& rd = d;`也就是，rb和rd引用的都是临时对象，而C++规定临时对象具有常性，所以这里就触发了权限放大，必须要用常用引用才可以。
+
+```c++
+const int x = 1;
+    //权限不能放大
+    //int& x1 = x;
+    const int& x2 = x;
+
+    int y = 2;
+    //权限可以缩小
+    const int& y1 = y;
+```
+
+> [!IMPORTANT]
+>
+> ```C++
+> double num = 1.1;
+> //double转int产生临时对象(取num的整型部分)，只有const引用才能绑定临时对象，
+> //numC是临时对象的别名，num的改变不会影响numC
+> const int& numC = num;
+> cout << num << endl;
+> cout << numC << endl;
+> num++;
+> cout << num << endl;
+> cout << numC << endl;
+> ```
+
+### 5、指针和引用的关系
+
+C++中指针和引用就像两个性格迥异的亲兄弟,指针是哥哥,引用是弟弟,在实践中他们相辅相成,功能有重叠性,但是各有自己的特点,互相不可替代。
+
+- 语 法 概 念 上 引 用 是 一 个 变 量 的 取 别 名 不 开 空 间 , 指 针 是 存 储 一 个 变 量 地 址 , 要 开 空 间 。
+- 引 用 在 定 义 时 必 须 初 始 化 , 指 针 建 议 初 始 化 , 但 是 语 法 上 不 是 必 须 的 。
+- 引 用 在 初 始 化 时 引 用 一 个 对 象 后 , 就 不 能 再 引 用 其 他 对 象 ; 而 指 针 可 以 在 不 断 地 改 变 指 向 对 象 。
+- 引 用 可 以 直 接 访 问 指 向 对 象 , 指 针 需 要 解 引 用 才 是 访 问 指 向 对 象 。
+- sizeof 中 含 义 不 同 , 引 用 结 果 为 引 用 类 型 的 大 小 , 但 指 针 始 终 是 地 址 空 间 所 占 字 节 个 数 (32 位 平 台 下占4个字节,64位下是8byte)
+- 指 针 很 容 易 出 现 空 指 针 和 野 指 针 的 问 题 , 引 用 很 少 出 现 , 引 用 使 用 起 来 相 对 更 安 全 一 些 。
+
+        ## 六、inline
+
+- 用inline修饰的函数叫内联函数，编译时C++编译器会在调用的地方展开内联函数，这样调用内联函数就不需要建立栈帧了，就可以提高效率。
+- inline对s于编译器而言只是一个建议，加了incline编译器也可以选择在调用的地方不展开，不同编译器关于incline的情况展开各不相同，因为C++标准没有规定这个。***inline适用于频繁调用的短小函数，对于递归函数，代码相对多一些的函数，加上inline也会被编译器忽略。***
+- C语言实现宏函数也会在预处理时替换展开，但是宏函数实现很复杂很容易出错，且不方便调试，C++设计了incline目的就是替代C的宏函数。
+- vs编译器debug版本下面默认是不展开inline的，这样方便调试，debug版本想展开需要设置。
+- inline不建议声明和定义分离到两个文件，分离会导致链接错误。因为inline被展开，就没有函数地址，链接时会出现报错。
+
+> 宏函数
+>
+> 优点：预处理阶段替换，不用建立栈帧，本质提效
+>
+> 缺点：复杂 / 类型安全检查 / 不能调试
+
+
+
+## 七、nullptr
+
+- NULL实际是一个宏，在传统的C头文件(stddef.h)中。
+
+```C++
+#ifndef NULL
+	#ifdef __cplusplus
+		#define NULL   0
+	#else
+		#define NULL   ((void*)0)
+#endif
+```
+
+- C++中NULL可能被定义为字面常量0，或者C中被定义为无类型指针(void*)的常量。不论采取何种定义，在使用空值的指针时，都不可避免的会遇到一些麻烦，本想通过(NULL)调用指针版本的f(int*)函数，但是由于NULL被定义成0，调用了f(int x)，因此与程序的初衷相悖。f((void*)NULL);调用会报错。
+- C++11中引入nullptr，nullptr是一个特殊类型的字面量，它可以转换成任意其他类型的指针类型。使用nullptr定义空指针可以避免类型转换的问题，因为nullptr只能被隐式地转换为指针类型，而不能被转换整数类型
+
+```C++
+void f(int x)
+{
+    cout << "f(int x)" << endl;
+}
+
+void f(int* ptr)
+{
+    cout << "f(int* ptr)" << endl;
+}
+
+int main()
+{
+    f(0);
+    f(nullptr);
+
+    return 0;
+}
 ```
 
